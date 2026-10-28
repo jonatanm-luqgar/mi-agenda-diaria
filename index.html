@@ -92,7 +92,7 @@
     </div>
   </div>
 
-  <!-- MODAL 2: Calendario de Eventos Extendido (Coincide exactamente con la imagen 2) -->
+  <!-- MODAL 2: Calendario de Eventos Extendido -->
   <div id="fullCalendarModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-40 hidden flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
     <div class="bg-[#0f172a] border border-[#1e293b] rounded-2xl w-full max-w-5xl p-4 sm:p-6 shadow-2xl flex flex-col my-auto max-h-[95vh] overflow-y-auto">
       
@@ -366,14 +366,15 @@
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // Firebase Config Demo
+    // Configuración Firebase del Proyecto
     const firebaseConfig = {
-      apiKey: "AIzaSyDemoConfigKeyForAgendaApp2026",
-      authDomain: "agenda-diaria-app.firebaseapp.com",
-      projectId: "agenda-diaria-app",
-      storageBucket: "agenda-diaria-app.appspot.com",
-      messagingSenderId: "123456789",
-      appId: "1:123456789:web:abcdef123456"
+      apiKey: "AIzaSyBlE7RSvTxN4Rxh8Ew4EsI0aM6h3I1GsOA",
+      authDomain: "gggg-5dc02.firebaseapp.com",
+      projectId: "gggg-5dc02",
+      storageBucket: "gggg-5dc02.firebasestorage.app",
+      messagingSenderId: "400115523734",
+      appId: "1:400115523734:web:baeda3204fdda3432162b7",
+      measurementId: "G-Y8D6CZ7MWM"
     };
 
     // Estado Global de la Aplicación
@@ -382,7 +383,7 @@
     let sideCalendarViewDate = new Date();
     let modalCalendarViewDate = new Date();
     let selectedModalDate = new Date();
-    let selectedEventColor = '#3b82f6'; // Azul por defecto
+    let selectedEventColor = '#3b82f6';
 
     let dayData = {
       timeBlocks: {},
@@ -390,7 +391,7 @@
       notes: ''
     };
 
-    let eventsData = {}; // Estructura: { 'YYYY-MM-DD': [{ id, text, color }] }
+    let eventsData = {};
 
     let db = null;
     let auth = null;
@@ -400,7 +401,6 @@
 
     localStorage.setItem('agenda_sync_key', currentSyncKey);
 
-    // Definición de Bloques de Tiempo de 30 min (06:00 a 23:30 = 36 bloques)
     const TIME_SLOTS = [];
     for (let h = 6; h <= 23; h++) {
       const hourStr = h.toString().padStart(2, '0');
@@ -408,7 +408,6 @@
       TIME_SLOTS.push({ id: `${hourStr}:30`, label: `${hourStr}:30`, sublabel: `-> ${(h === 23 ? 0 : h + 1).toString().padStart(2, '0')}:00` });
     }
 
-    // Formatear Fecha YYYY-MM-DD
     function formatDateKey(date) {
       const y = date.getFullYear();
       const m = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -444,7 +443,6 @@
       }
     }
 
-    // Sincronización en Tiempo Real con Firestore
     function setupFirestoreListeners() {
       if (!db || !isCloudConnected) return;
 
@@ -453,7 +451,6 @@
 
       const dateKey = formatDateKey(currentDate);
 
-      // 1. Escuchar datos del día actual
       const dayDocRef = doc(db, 'artifacts', 'mi-agenda-diaria', 'users', currentSyncKey, 'days', dateKey);
       dayUnsubscribe = onSnapshot(dayDocRef, (snap) => {
         if (snap.exists()) {
@@ -469,7 +466,6 @@
         renderMainView();
       }, (err) => console.error("Error sync día", err));
 
-      // 2. Escuchar colección de eventos globales
       const eventsDocRef = doc(db, 'artifacts', 'mi-agenda-diaria', 'users', currentSyncKey, 'calendar', 'events');
       eventsUnsubscribe = onSnapshot(eventsDocRef, (snap) => {
         if (snap.exists()) {
@@ -482,7 +478,6 @@
       }, (err) => console.error("Error sync eventos", err));
     }
 
-    // Guardar Datos
     function saveDayData() {
       const dateKey = formatDateKey(currentDate);
       localStorage.setItem(`agenda_day_${currentSyncKey}_${dateKey}`, JSON.stringify(dayData));
@@ -502,7 +497,6 @@
       }
     }
 
-    // Fallback Local Storage
     function loadLocalFallback() {
       const dateKey = formatDateKey(currentDate);
       const storedDay = localStorage.getItem(`agenda_day_${currentSyncKey}_${dateKey}`);
@@ -520,24 +514,18 @@
       renderModalCalendar();
     }
 
-    // Renderizado de Vista Principal
     function renderMainView() {
-      // Header fecha
       const datePicker = document.getElementById('datePicker');
       datePicker.value = formatDateKey(currentDate);
 
       const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
       document.getElementById('fullDateDisplay').textContent = currentDate.toLocaleDateString('es-ES', options);
 
-      // Bloques de Tiempo
       renderTimeBlocks();
-      // Tareas
       renderTasks();
-      // Notas
       renderNotes();
     }
 
-    // 1. Render Bloques de Tiempo
     function renderTimeBlocks() {
       const container = document.getElementById('timeBlocksContainer');
       container.innerHTML = '';
@@ -580,7 +568,6 @@
 
       document.getElementById('completedBlocksCount').textContent = completedCount;
 
-      // Event listeners
       container.querySelectorAll('.block-text-input').forEach(input => {
         input.addEventListener('change', (e) => {
           const slotId = e.target.getAttribute('data-slot');
@@ -611,7 +598,6 @@
       });
     }
 
-    // 2. Render Tareas
     function renderTasks() {
       const list = document.getElementById('taskList');
       const emptyNotice = document.getElementById('emptyTasksNotice');
@@ -660,12 +646,10 @@
       });
     }
 
-    // 3. Render Apuntes
     function renderNotes() {
       document.getElementById('dailyNotesInput').value = dayData.notes || '';
     }
 
-    // 4. Render Calendario Previa Lateral
     function renderSideCalendar() {
       const year = sideCalendarViewDate.getFullYear();
       const month = sideCalendarViewDate.getMonth();
@@ -723,7 +707,6 @@
       }
     }
 
-    // 5. Render MODAL CALENDARIO DE EVENTOS (Idéntico a Imagen 2)
     function renderModalCalendar() {
       const year = modalCalendarViewDate.getFullYear();
       const month = modalCalendarViewDate.getMonth();
@@ -739,7 +722,6 @@
       const daysInMonth = new Date(year, month + 1, 0).getDate();
       const daysInPrevMonth = new Date(year, month, 0).getDate();
 
-      // Días mes anterior
       for (let i = startingDay - 1; i >= 0; i--) {
         const div = document.createElement('div');
         div.className = 'min-h-[70px] sm:min-h-[85px] bg-[#111827]/40 border border-gray-800/40 rounded-xl p-2 text-gray-700 select-none';
@@ -761,7 +743,6 @@
           isSelected ? 'border-brand-500 ring-2 ring-brand-500/30 bg-[#1c293e]' : 'border-gray-800 hover:border-gray-700'
         }`;
 
-        // Header celda día + Badge contador
         let html = `
           <div class="flex justify-between items-center w-full">
             <span class="text-xs sm:text-sm font-bold text-white">${day}</span>
@@ -770,7 +751,6 @@
           <div class="space-y-1 mt-1 overflow-hidden">
         `;
 
-        // Píldoras de eventos dentro de la celda
         dayEvents.slice(0, 2).forEach(evt => {
           html += `
             <div class="text-[10px] font-semibold text-white px-2 py-0.5 rounded-md truncate flex items-center gap-1 shadow-sm" style="background-color: ${evt.color || '#3b82f6'}22; border-left: 3px solid ${evt.color || '#3b82f6'}">
@@ -798,7 +778,6 @@
       renderSelectedDayDetails();
     }
 
-    // Renderizar Panel Inferior del Día Seleccionado en Modal
     function renderSelectedDayDetails() {
       const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
       document.getElementById('selectedDayTitle').textContent = selectedModalDate.toLocaleDateString('es-ES', options);
@@ -842,16 +821,13 @@
       }
     }
 
-    // Utilidad Escape HTML
     function escapeHtml(str) {
       return (str || '').replace(/[&<>"']/g, (m) => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
       }[m]));
     }
 
-    // EVENT LISTENERS DE NAVEGACIÓN Y ACCIONES
-
-    // Navegación de Fechas en Vista Principal
+    // Event Listeners
     document.getElementById('datePicker').addEventListener('change', (e) => {
       if (e.target.value) {
         const [y, m, d] = e.target.value.split('-').map(Number);
@@ -883,7 +859,6 @@
       loadLocalFallback();
     });
 
-    // Calendario Previa
     document.getElementById('sideCalPrevMonth').addEventListener('click', () => {
       sideCalendarViewDate.setMonth(sideCalendarViewDate.getMonth() - 1);
       renderSideCalendar();
@@ -894,7 +869,6 @@
       renderSideCalendar();
     });
 
-    // Acciones Tareas y Notas
     document.getElementById('addTaskForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const input = document.getElementById('newTaskInput');
@@ -921,7 +895,6 @@
       }
     });
 
-    // Modal de Calendario Completo (Abrir / Cerrar)
     const fullCalendarModal = document.getElementById('fullCalendarModal');
     const openFullCalendarBtn = document.getElementById('openFullCalendarBtn');
     const quickAddEventBtn = document.getElementById('quickAddEventBtn');
@@ -957,7 +930,6 @@
       renderModalCalendar();
     });
 
-    // Selección de Color para Eventos
     document.querySelectorAll('.color-picker-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.color-picker-btn').forEach(b => {
@@ -968,7 +940,6 @@
       });
     });
 
-    // Añadir Evento
     document.getElementById('addEventBtn').addEventListener('click', () => {
       const input = document.getElementById('newEventTextInput');
       const text = input.value.trim();
@@ -989,7 +960,6 @@
       }
     });
 
-    // Botón "Ver agenda" desde el modal
     document.getElementById('goToAgendaBtn').addEventListener('click', () => {
       currentDate = new Date(selectedModalDate);
       sideCalendarViewDate = new Date(currentDate);
@@ -998,7 +968,6 @@
       loadLocalFallback();
     });
 
-    // Modal de Sincronización
     const syncModal = document.getElementById('syncModal');
     const openSyncModalBtn = document.getElementById('openSyncModalBtn');
     const closeSyncModalBtn = document.getElementById('closeSyncModalBtn');
@@ -1025,7 +994,6 @@
       }
     });
 
-    // Carga inicial
     loadLocalFallback();
 
   </script>
