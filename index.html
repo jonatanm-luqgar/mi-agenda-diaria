@@ -1,1033 +1,552 @@
 <!DOCTYPE html>
-<html lang="es" class="dark">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi Agenda Diaria - Planificador y Calendario de Eventos</title>
-  <!-- Tailwind CSS -->
+  <title>Mi Agenda Diaria</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- Google Fonts Inter -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#eff6ff',
-              100: '#dbeafe',
-              500: '#3b82f6',
-              600: '#2563eb',
-              700: '#1d4ed8',
-              900: '#1e3a8a',
-            },
-            darkBg: '#090d16',
-            darkCard: '#111827',
-            darkCardBorder: '#1e293b',
-            darkInput: '#162032',
-            darkInputHover: '#1d2a40'
-          },
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-          }
-        }
-      }
-    }
-  </script>
-  
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <style>
-    body {
-      background-color: #090d16;
-      color: #f3f4f6;
-      font-family: 'Inter', sans-serif;
-    }
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #090d16;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #1f2937;
-      border-radius: 9999px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #374151;
-    }
-    input, textarea, button {
-      transition: all 0.15s ease-in-out;
-    }
+    body { background-color: #0b101d; color: #94a3b8; font-family: system-ui, -apple-system, sans-serif; }
+    .card-bg { background-color: #111827; border: 1px solid #1f293d; }
+    .input-bg { background-color: #1a2333; border: 1px solid #28354d; color: #f3f4f6; }
+    .input-bg:focus { outline: none; border-color: #3b82f6; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #111827; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #1f293d; border-radius: 4px; }
   </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between text-gray-200">
+<body class="min-h-screen p-4 md:p-6 custom-scrollbar">
 
-  <!-- MODAL 1: Configuración / Sincronización -->
-  <div id="syncModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-darkCard border border-darkCardBorder rounded-2xl w-full max-w-md p-6 shadow-2xl">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-semibold text-white flex items-center gap-2">
-          <i class="fa-solid fa-rotate text-brand-500"></i> Sincronización Multidispositivo
-        </h3>
-        <button id="closeSyncModalBtn" class="text-gray-400 hover:text-white text-xl p-1">&times;</button>
+  <!-- ENCABEZADO -->
+  <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-800">
+    <div class="flex items-center gap-3">
+      <div class="p-3 bg-blue-600 rounded-xl text-white shadow-lg">
+        <i class="fa-regular fa-calendar-check text-2xl"></i>
       </div>
-      <p class="text-sm text-gray-400 mb-4">
-        Introduce un código o ID de sincronización único. Usa este mismo ID en tu iPhone, Tablet Galaxy y Portátil para mantener todos tus datos actualizados en tiempo real.
-      </p>
-      <div class="space-y-4">
-        <div>
-          <label class="block text-xs text-gray-400 uppercase font-semibold mb-1">Tu ID de Sincronización</label>
-          <input type="text" id="syncUserKey" placeholder="ej. mi-agenda-secreta-2026" class="w-full bg-darkInput border border-gray-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-brand-500 text-sm">
-        </div>
-        <div class="flex justify-end gap-3 pt-2">
-          <button id="saveSyncKeyBtn" class="w-full bg-brand-600 hover:bg-brand-500 text-white font-medium py-2.5 px-4 rounded-xl shadow-lg transition text-sm">
-            Guardar y Conectar
-          </button>
-        </div>
+      <div>
+        <h1 class="text-xl font-bold text-white tracking-wide">Mi Agenda Diaria</h1>
+        <p class="text-xs text-gray-400">Planificador de bloques de 30 min</p>
       </div>
     </div>
-  </div>
 
-  <!-- MODAL 2: Calendario de Eventos Extendido (Coincide exactamente con la imagen 2) -->
-  <div id="fullCalendarModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-40 hidden flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-    <div class="bg-[#0f172a] border border-[#1e293b] rounded-2xl w-full max-w-5xl p-4 sm:p-6 shadow-2xl flex flex-col my-auto max-h-[95vh] overflow-y-auto">
-      
-      <!-- Encabezado Modal Calendario -->
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-800">
-        <div class="flex items-center gap-3">
-          <div class="bg-brand-600/20 text-brand-500 p-3 rounded-xl border border-brand-500/30">
-            <i class="fa-regular fa-calendar-days text-xl"></i>
-          </div>
-          <div>
-            <h2 class="text-lg font-bold text-white">Calendario de Eventos</h2>
-            <p class="text-xs text-gray-400">Clic en un día para agregar o ver eventos</p>
-          </div>
-        </div>
+    <!-- FECHA Y NAVEGACIÓN -->
+    <div class="flex items-center gap-2 self-center">
+      <button onclick="changeDate(-1)" class="p-2 card-bg rounded-lg text-gray-300 hover:bg-gray-800 transition"><i class="fa-solid fa-chevron-left"></i></button>
+      <div class="flex items-center gap-2 card-bg px-4 py-2 rounded-lg text-sm text-white font-medium">
+        <i class="fa-regular fa-calendar text-blue-400"></i>
+        <input type="date" id="datePicker" class="bg-transparent border-none text-white focus:outline-none cursor-pointer" onchange="onDateChange(this.value)">
+      </div>
+      <button onclick="changeDate(1)" class="p-2 card-bg rounded-lg text-gray-300 hover:bg-gray-800 transition"><i class="fa-solid fa-chevron-right"></i></button>
+      <button onclick="goToToday()" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow transition">Hoy</button>
+    </div>
 
-        <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-          <div class="flex items-center gap-2 bg-[#162032] px-3 py-1.5 rounded-xl border border-gray-800">
-            <button id="modalCalPrevMonth" class="text-gray-400 hover:text-white px-2 py-1">
-              <i class="fa-solid fa-chevron-left text-xs"></i>
-            </button>
-            <span id="modalCalTitle" class="text-xs font-bold text-white uppercase tracking-wider px-2">OCTUBRE DE 2026</span>
-            <button id="modalCalNextMonth" class="text-gray-400 hover:text-white px-2 py-1">
-              <i class="fa-solid fa-chevron-right text-xs"></i>
-            </button>
-          </div>
-          
-          <button id="modalCalTodayBtn" class="bg-[#1e293b] hover:bg-gray-700 text-gray-200 text-xs font-semibold px-3 py-2 rounded-xl border border-gray-700">
-            Hoy
-          </button>
-          
-          <button id="closeFullCalendarModalBtn" class="text-gray-400 hover:text-white p-2 rounded-xl bg-gray-800/50 hover:bg-gray-800 transition">
-            <i class="fa-solid fa-xmark text-lg"></i>
-          </button>
+    <!-- INDICADOR DE ESTADO EN TIEMPO REAL -->
+    <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      <span class="text-xs text-emerald-400 font-medium">Sincronizado en la nube</span>
+    </div>
+  </header>
+
+  <!-- VISTA PRINCIPAL -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-[1600px] mx-auto">
+    
+    <!-- COLUMNA IZQUIERDA: BLOQUES DE TIEMPO -->
+    <section class="lg:col-span-7 card-bg rounded-2xl p-5 shadow-xl flex flex-col h-[calc(100vh-140px)]">
+      <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-800">
+        <div class="flex items-center gap-2">
+          <i class="fa-regular fa-clock text-blue-400"></i>
+          <h2 class="text-lg font-bold text-white">Bloques de Tiempo</h2>
         </div>
+        <button onclick="clearBlocks()" class="text-xs text-gray-400 hover:text-red-400 transition flex items-center gap-1">
+          <i class="fa-solid fa-trash-can"></i> Limpiar
+        </button>
       </div>
 
-      <!-- Cuadrícula de Calendario de Eventos -->
-      <div class="py-4">
-        <div id="modalCalendarGrid" class="grid grid-cols-7 gap-1.5 sm:gap-2">
+      <div id="timeBlocksContainer" class="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-2">
+        <!-- Generado dinámicamente -->
+      </div>
+    </section>
+
+    <!-- COLUMNA DERECHA: CALENDARIO MINI, TAREAS Y NOTAS -->
+    <section class="lg:col-span-5 space-y-6 flex flex-col h-[calc(100vh-140px)]">
+      
+      <!-- MINI CALENDARIO -->
+      <div class="card-bg rounded-2xl p-5 shadow-xl">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <i class="fa-regular fa-calendar-days text-blue-400"></i>
+            <h2 class="text-base font-bold text-white">Calendario</h2>
+          </div>
+          <button onclick="openFullCalendar()" class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
+            <i class="fa-solid fa-up-right-from-square"></i> Abrir
+          </button>
+        </div>
+        <div id="miniCalendar" class="grid grid-cols-7 gap-1 text-center text-xs">
           <!-- Generado dinámicamente -->
         </div>
       </div>
 
-      <!-- Panel Inferior: Detalle del Día Seleccionado y Creador de Eventos -->
-      <div class="bg-[#162032] border border-gray-800 rounded-2xl p-4 sm:p-5 mt-2 space-y-4">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <div>
-            <h3 id="selectedDayTitle" class="text-base font-bold text-white capitalize">Jueves, 29 De Octubre De 2026</h3>
-            <p class="text-xs text-gray-400">Eventos del día</p>
-          </div>
-          <button id="goToAgendaBtn" class="bg-brand-600/20 text-brand-400 hover:bg-brand-600/30 border border-brand-500/30 text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-2 transition">
-            <span>Ver agenda</span>
-            <i class="fa-solid fa-arrow-right text-xs"></i>
-          </button>
-        </div>
-
-        <!-- Lista de Píldoras de Eventos del Día Seleccionado -->
-        <div id="selectedDayEventsList" class="flex flex-wrap gap-2 py-1 min-h-[32px]">
-          <!-- Píldoras de evento -->
-        </div>
-
-        <!-- Formulario Nuevo Evento -->
-        <div class="space-y-2 pt-2 border-t border-gray-800/80">
-          <label class="block text-[11px] uppercase font-bold text-gray-400 tracking-wider">Nuevo Evento</label>
-          <div class="flex flex-col md:flex-row gap-3">
-            <input type="text" id="newEventTextInput" placeholder="Ej: Examen de Cálculo, Cita médica..." class="flex-grow bg-[#090d16] border border-gray-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500 placeholder-gray-500">
-            
-            <!-- Paleta de Colores Circular (6 Opciones) -->
-            <div class="flex items-center gap-2 justify-center py-1">
-              <button type="button" data-color="#3b82f6" class="color-picker-btn w-7 h-7 rounded-full bg-blue-500 ring-2 ring-white scale-110 transition"></button>
-              <button type="button" data-color="#ef4444" class="color-picker-btn w-7 h-7 rounded-full bg-red-500 hover:scale-105 transition"></button>
-              <button type="button" data-color="#10b981" class="color-picker-btn w-7 h-7 rounded-full bg-emerald-500 hover:scale-105 transition"></button>
-              <button type="button" data-color="#eab308" class="color-picker-btn w-7 h-7 rounded-full bg-yellow-500 hover:scale-105 transition"></button>
-              <button type="button" data-color="#a855f7" class="color-picker-btn w-7 h-7 rounded-full bg-purple-500 hover:scale-105 transition"></button>
-              <button type="button" data-color="#f97316" class="color-picker-btn w-7 h-7 rounded-full bg-orange-500 hover:scale-105 transition"></button>
-            </div>
-
-            <button id="addEventBtn" class="bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-lg flex items-center justify-center gap-2 transition shrink-0">
-              <i class="fa-solid fa-plus"></i>
-              <span>Agregar evento</span>
-            </button>
-          </div>
-        </div>
-
-      </div>
-
-    </div>
-  </div>
-
-  <!-- CONTENEDOR PRINCIPAL -->
-  <div class="max-w-7xl w-full mx-auto p-3 sm:p-6 space-y-6">
-
-    <!-- Header Principal -->
-    <header class="flex flex-col md:flex-row items-center justify-between gap-4 bg-darkCard border border-darkCardBorder p-4 rounded-2xl shadow-xl">
-      
-      <!-- Logo y Título -->
-      <div class="flex items-center gap-3 w-full md:w-auto">
-        <div class="bg-brand-600/20 text-brand-500 p-2.5 rounded-xl border border-brand-500/30 flex items-center justify-center">
-          <i class="fa-regular fa-calendar-check text-2xl"></i>
-        </div>
-        <div>
-          <h1 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            Mi Agenda Diaria
-          </h1>
-          <p class="text-xs text-gray-400 font-medium">Planificador de bloques de 30 min</p>
-        </div>
-      </div>
-
-      <!-- Control de Fecha -->
-      <div class="flex items-center gap-2 bg-darkInput p-1.5 rounded-xl border border-gray-800">
-        <button id="prevDayBtn" class="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition">
-          <i class="fa-solid fa-chevron-left text-xs"></i>
-        </button>
-        <div class="flex items-center gap-2 px-2 text-sm font-semibold text-white">
-          <i class="fa-regular fa-calendar text-brand-500"></i>
-          <input type="date" id="datePicker" class="bg-transparent text-white font-medium focus:outline-none cursor-pointer text-sm">
-        </div>
-        <button id="nextDayBtn" class="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition">
-          <i class="fa-solid fa-chevron-right text-xs"></i>
-        </button>
-        <button id="todayBtn" class="ml-1 px-3 py-1 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-lg shadow">
-          Hoy
-        </button>
-      </div>
-
-      <!-- Botón de Sincronización -->
-      <div class="flex items-center gap-3 w-full md:w-auto justify-end">
-        <button id="openSyncModalBtn" class="flex items-center gap-2 bg-brand-600/10 text-brand-400 border border-brand-500/30 hover:bg-brand-600/20 px-3 py-1.5 rounded-xl text-xs font-semibold transition">
-          <i class="fa-solid fa-rotate text-sm"></i>
-          <span id="syncStatusLabel">Sincronizar</span>
-        </button>
-      </div>
-    </header>
-
-    <!-- Subheader Información -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center px-1 text-xs text-gray-400 gap-2">
-      <div id="fullDateDisplay" class="font-semibold text-gray-300 capitalize text-sm">
-        <!-- Fecha formateada -->
-      </div>
-      <div id="blockStatsDisplay" class="bg-darkCard px-3 py-1 rounded-lg border border-darkCardBorder font-medium">
-        Bloques: <span id="completedBlocksCount" class="text-brand-500 font-bold">0</span>/36
-      </div>
-    </div>
-
-    <!-- Rejilla Principal de 2 Columnas -->
-    <main class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-      <!-- Columna Izquierda: Bloques de Tiempo (30 min) -->
-      <section class="lg:col-span-7 bg-darkCard border border-darkCardBorder rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col">
-        
-        <div class="flex items-center justify-between pb-4 mb-4 border-b border-gray-800">
+      <!-- TAREAS DEL DÍA -->
+      <div class="card-bg rounded-2xl p-5 shadow-xl flex-1 flex flex-col">
+        <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
-            <div class="text-brand-500 bg-brand-500/10 p-2 rounded-lg">
-              <i class="fa-regular fa-clock"></i>
-            </div>
-            <div>
-              <h2 class="text-base font-bold text-white">Bloques de Tiempo</h2>
-              <p class="text-xs text-gray-400">06:00 AM - 11:30 PM · bloques de 30 min</p>
-            </div>
+            <i class="fa-regular fa-square-check text-emerald-400"></i>
+            <h2 class="text-base font-bold text-white">Tareas del Día</h2>
           </div>
-          <button id="clearBlocksBtn" class="text-xs text-gray-400 hover:text-red-400 flex items-center gap-1 transition px-2 py-1 rounded-lg hover:bg-gray-800">
-            <i class="fa-regular fa-trash-can"></i> Limpiar
-          </button>
+          <span id="tasksCounter" class="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">0/0</span>
         </div>
-
-        <!-- Contenedor Scrollable de Bloques -->
-        <div id="timeBlocksContainer" class="space-y-2 max-h-[720px] overflow-y-auto pr-1">
-          <!-- Bloques renderizados por JS -->
+        <div class="flex gap-2 mb-3">
+          <input type="text" id="newTaskInput" placeholder="Añadir una tarea..." class="flex-1 input-bg px-3 py-2 rounded-lg text-sm" onkeypress="if(event.key==='Enter') addTask()">
+          <button onclick="addTask()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm shadow transition">+</button>
         </div>
+        <ul id="tasksList" class="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-1">
+          <!-- Generado dinámicamente -->
+        </ul>
+      </div>
 
-      </section>
-
-      <!-- Columna Derecha: Widgets (Calendario Compacto, Tareas, Apuntes) -->
-      <section class="lg:col-span-5 space-y-6">
-
-        <!-- Widget Calendario Compacto -->
-        <div class="bg-darkCard border border-darkCardBorder rounded-2xl p-5 shadow-xl">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-2">
-              <div class="text-brand-500 bg-brand-500/10 p-2 rounded-lg">
-                <i class="fa-regular fa-calendar-days"></i>
-              </div>
-              <h2 class="text-base font-bold text-white">Calendario</h2>
-            </div>
-            <button id="openFullCalendarBtn" class="text-xs text-gray-300 hover:text-white flex items-center gap-1.5 bg-darkInput px-3 py-1.5 rounded-lg border border-gray-800 hover:border-gray-700 transition">
-              <i class="fa-solid fa-expand text-[10px]"></i>
-              <span>Abrir</span>
-            </button>
-          </div>
-
-          <!-- Calendario Vista Previa Compacta -->
-          <div class="select-none">
-            <div class="flex justify-between items-center mb-3">
-              <button id="sideCalPrevMonth" class="text-gray-400 hover:text-white p-1 text-sm">
-                <i class="fa-solid fa-chevron-left"></i>
-              </button>
-              <span id="sideCalMonthYearTitle" class="text-sm font-semibold text-white capitalize">Octubre De 2026</span>
-              <button id="sideCalNextMonth" class="text-gray-400 hover:text-white p-1 text-sm">
-                <i class="fa-solid fa-chevron-right"></i>
-              </button>
-            </div>
-
-            <div class="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-gray-500 mb-2">
-              <div>L</div><div>M</div><div>X</div><div>J</div><div>V</div><div>S</div><div>D</div>
-            </div>
-
-            <div id="sideCalendarGrid" class="grid grid-cols-7 gap-1 text-center text-xs">
-              <!-- Grid Días -->
-            </div>
-
-            <button id="quickAddEventBtn" class="w-full mt-4 py-2 bg-darkInput hover:bg-gray-800 border border-gray-800 rounded-xl text-xs font-medium text-gray-300 hover:text-white flex items-center justify-center gap-2 transition">
-              <i class="fa-solid fa-plus text-brand-500"></i>
-              <span>Agregar evento al calendario</span>
-            </button>
-          </div>
+      <!-- APUNTES DEL DÍA -->
+      <div class="card-bg rounded-2xl p-5 shadow-xl flex-1 flex flex-col">
+        <div class="flex items-center gap-2 mb-3">
+          <i class="fa-regular fa-file-lines text-amber-400"></i>
+          <h2 class="text-base font-bold text-white">Apuntes del Día</h2>
         </div>
+        <textarea id="notesArea" placeholder="Escribe aquí ideas, reflexiones o recordatorios..." class="w-full flex-1 input-bg p-3 rounded-lg text-sm resize-none custom-scrollbar" oninput="saveNotes()"></textarea>
+      </div>
 
-        <!-- Widget Tareas del Día -->
-        <div class="bg-darkCard border border-darkCardBorder rounded-2xl p-5 shadow-xl">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-2">
-              <div class="text-emerald-500 bg-emerald-500/10 p-2 rounded-lg">
-                <i class="fa-regular fa-square-check"></i>
-              </div>
-              <h2 class="text-base font-bold text-white">Tareas del Día</h2>
-            </div>
-            <span id="tasksCounter" class="text-xs font-bold text-gray-400 bg-darkInput px-2.5 py-1 rounded-lg border border-gray-800">
-              0/0
-            </span>
-          </div>
-
-          <form id="addTaskForm" class="flex gap-2 mb-4">
-            <input type="text" id="newTaskInput" placeholder="Añadir una tarea..." class="flex-grow bg-darkInput border border-gray-800 focus:border-brand-500 text-sm text-white rounded-xl px-4 py-2 focus:outline-none placeholder-gray-500">
-            <button type="submit" class="bg-brand-600 hover:bg-brand-500 text-white rounded-xl px-4 py-2 text-lg font-bold flex items-center justify-center transition shadow-lg">
-              +
-            </button>
-          </form>
-
-          <div id="taskList" class="space-y-2 max-h-52 overflow-y-auto pr-1">
-            <!-- Lista tareas -->
-          </div>
-          <div id="emptyTasksNotice" class="text-center py-6 text-gray-500 text-xs hidden">
-            <i class="fa-regular fa-file-lines text-2xl mb-2 block"></i>
-            No hay tareas pendientes para hoy.
-          </div>
-        </div>
-
-        <!-- Widget Apuntes del Día -->
-        <div class="bg-darkCard border border-darkCardBorder rounded-2xl p-5 shadow-xl">
-          <div class="flex items-center gap-2 mb-3">
-            <div class="text-amber-500 bg-amber-500/10 p-2 rounded-lg">
-              <i class="fa-regular fa-note-sticky"></i>
-            </div>
-            <h2 class="text-base font-bold text-white">Apuntes del Día</h2>
-          </div>
-          <textarea id="dailyNotesInput" rows="4" placeholder="Escribe aquí ideas, reflexiones, resumen del día o recordatorios..." class="w-full bg-darkInput border border-gray-800 focus:border-amber-500/50 rounded-xl p-3 text-sm text-white focus:outline-none placeholder-gray-500 resize-none"></textarea>
-        </div>
-
-      </section>
-
-    </main>
+    </section>
   </div>
 
-  <footer class="text-center text-xs text-gray-600 py-4 mt-8 border-t border-darkCardBorder">
-    Mi Agenda Diaria &copy; 2026 · Sincronización en la Nube Activada
-  </footer>
+  <!-- MODAL COMPLETO DEL CALENDARIO DE EVENTOS -->
+  <div id="calendarModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden justify-center items-center p-4">
+    <div class="card-bg w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      
+      <!-- Cabecera Modal -->
+      <div class="p-4 bg-slate-900 border-b border-gray-800 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="p-2 bg-blue-600 rounded-lg text-white">
+            <i class="fa-regular fa-calendar-plus text-xl"></i>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-white">Calendario de Eventos</h3>
+            <p class="text-xs text-gray-400">Haz clic en un día para agregar o ver eventos</p>
+          </div>
+        </div>
 
-  <!-- Firebase v11 Script -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        <div class="flex items-center gap-3">
+          <button onclick="changeModalMonth(-1)" class="p-2 card-bg rounded-lg text-gray-300 hover:bg-gray-800"><i class="fa-solid fa-chevron-left"></i></button>
+          <span id="modalMonthTitle" class="text-sm font-bold text-white uppercase tracking-wider">OCTUBRE DE 2026</span>
+          <button onclick="changeModalMonth(1)" class="p-2 card-bg rounded-lg text-gray-300 hover:bg-gray-800"><i class="fa-solid fa-chevron-right"></i></button>
+          <button onclick="closeFullCalendar()" class="p-2 text-gray-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
 
-    // Firebase Config Demo
+      <!-- Cuadrícula del Calendario -->
+      <div class="p-4 overflow-y-auto custom-scrollbar flex-1">
+        <div class="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-semibold text-gray-400 uppercase">
+          <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+        </div>
+        <div id="modalCalendarGrid" class="grid grid-cols-7 gap-2">
+          <!-- Días renderizados dinámicamente -->
+        </div>
+      </div>
+
+      <!-- Panel Inferior de Eventos del Día Seleccionado -->
+      <div class="p-4 border-t border-gray-800 bg-slate-900/50">
+        <div id="selectedDayTitle" class="text-sm font-bold text-white mb-2">Selecciona un día</div>
+        
+        <div id="selectedDayEvents" class="flex flex-wrap gap-2 mb-3 max-h-24 overflow-y-auto custom-scrollbar">
+          <!-- Eventos del día -->
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-3 items-center">
+          <input type="text" id="newEventInput" placeholder="Ej: Examen de Cálculo, Cita médica..." class="flex-1 input-bg px-3 py-2 rounded-lg text-sm w-full">
+          
+          <div class="flex items-center gap-2">
+            <button onclick="selectColor('#3b82f6')" class="color-btn w-6 h-6 rounded-full bg-blue-500 ring-2 ring-white"></button>
+            <button onclick="selectColor('#ef4444')" class="color-btn w-6 h-6 rounded-full bg-red-500"></button>
+            <button onclick="selectColor('#10b981')" class="color-btn w-6 h-6 rounded-full bg-emerald-500"></button>
+            <button onclick="selectColor('#eab308')" class="color-btn w-6 h-6 rounded-full bg-yellow-500"></button>
+            <button onclick="selectColor('#a855f7')" class="color-btn w-6 h-6 rounded-full bg-purple-500"></button>
+            <button onclick="selectColor('#f97316')" class="color-btn w-6 h-6 rounded-full bg-orange-500"></button>
+          </div>
+
+          <button onclick="addCalendarEvent()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 w-full sm:w-auto justify-center">
+            <i class="fa-solid fa-plus"></i> Agregar evento
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let currentDate = new Date(2026, 9, 28);
+    let modalDate = new Date(2026, 9, 28);
+    let selectedModalDateStr = "2026-10-28";
+    let selectedColor = "#3b82f6";
+
+    let timeBlocksData = {};
+    let tasksData = {};
+    let notesData = {};
+    let calendarEventsData = {};
+
+    // ID de base de datos único para tu agenda personal
+    const UNIQUE_SYNC_KEY = "mi_agenda_personal_jonatan";
+
     const firebaseConfig = {
-      apiKey: "AIzaSyDemoConfigKeyForAgendaApp2026",
-      authDomain: "agenda-diaria-app.firebaseapp.com",
-      projectId: "agenda-diaria-app",
-      storageBucket: "agenda-diaria-app.appspot.com",
-      messagingSenderId: "123456789",
-      appId: "1:123456789:web:abcdef123456"
+      databaseURL: "https://agenda-diaria-default-rtdb.firebaseio.com"
     };
 
-    // Estado Global de la Aplicación
-    let currentDate = new Date();
-    let currentSyncKey = localStorage.getItem('agenda_sync_key') || ('user_' + Math.random().toString(36).substr(2, 9));
-    let sideCalendarViewDate = new Date();
-    let modalCalendarViewDate = new Date();
-    let selectedModalDate = new Date();
-    let selectedEventColor = '#3b82f6'; // Azul por defecto
+    let syncDbRef = null;
 
-    let dayData = {
-      timeBlocks: {},
-      tasks: [],
-      notes: ''
-    };
-
-    let eventsData = {}; // Estructura: { 'YYYY-MM-DD': [{ id, text, color }] }
-
-    let db = null;
-    let auth = null;
-    let isCloudConnected = false;
-    let dayUnsubscribe = null;
-    let eventsUnsubscribe = null;
-
-    localStorage.setItem('agenda_sync_key', currentSyncKey);
-
-    // Definición de Bloques de Tiempo de 30 min (06:00 a 23:30 = 36 bloques)
-    const TIME_SLOTS = [];
-    for (let h = 6; h <= 23; h++) {
-      const hourStr = h.toString().padStart(2, '0');
-      TIME_SLOTS.push({ id: `${hourStr}:00`, label: `${hourStr}:00`, sublabel: `-> ${hourStr}:30` });
-      TIME_SLOTS.push({ id: `${hourStr}:30`, label: `${hourStr}:30`, sublabel: `-> ${(h === 23 ? 0 : h + 1).toString().padStart(2, '0')}:00` });
-    }
-
-    // Formatear Fecha YYYY-MM-DD
-    function formatDateKey(date) {
-      const y = date.getFullYear();
-      const m = (date.getMonth() + 1).toString().padStart(2, '0');
-      const d = date.getDate().toString().padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    }
-
-    // Inicializar Firebase
-    try {
-      const app = initializeApp(firebaseConfig);
-      auth = getAuth(app);
-      db = getFirestore(app);
-
-      signInAnonymously(auth).then(() => {
-        isCloudConnected = true;
-        updateSyncStatusUI('Sincronizado', 'text-emerald-400');
-        setupFirestoreListeners();
-      }).catch(err => {
-        console.warn("Modo fallback local:", err);
-        updateSyncStatusUI('Modo Local', 'text-amber-400');
-        loadLocalFallback();
-      });
-    } catch (e) {
-      updateSyncStatusUI('Modo Local', 'text-amber-400');
-      loadLocalFallback();
-    }
-
-    function updateSyncStatusUI(text, colorClass) {
-      const label = document.getElementById('syncStatusLabel');
-      if (label) {
-        label.textContent = text;
-        label.className = `${colorClass} font-semibold`;
-      }
-    }
-
-    // Sincronización en Tiempo Real con Firestore
-    function setupFirestoreListeners() {
-      if (!db || !isCloudConnected) return;
-
-      if (dayUnsubscribe) dayUnsubscribe();
-      if (eventsUnsubscribe) eventsUnsubscribe();
-
-      const dateKey = formatDateKey(currentDate);
-
-      // 1. Escuchar datos del día actual
-      const dayDocRef = doc(db, 'artifacts', 'mi-agenda-diaria', 'users', currentSyncKey, 'days', dateKey);
-      dayUnsubscribe = onSnapshot(dayDocRef, (snap) => {
-        if (snap.exists()) {
-          const d = snap.data();
-          dayData = {
-            timeBlocks: d.timeBlocks || {},
-            tasks: d.tasks || [],
-            notes: d.notes || ''
-          };
-        } else {
-          dayData = { timeBlocks: {}, tasks: [], notes: '' };
+    // Sincronización Automática al Cargar
+    function initAutoSync() {
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
         }
-        renderMainView();
-      }, (err) => console.error("Error sync día", err));
 
-      // 2. Escuchar colección de eventos globales
-      const eventsDocRef = doc(db, 'artifacts', 'mi-agenda-diaria', 'users', currentSyncKey, 'calendar', 'events');
-      eventsUnsubscribe = onSnapshot(eventsDocRef, (snap) => {
-        if (snap.exists()) {
-          eventsData = snap.data().allEvents || {};
-        } else {
-          eventsData = {};
-        }
-        renderSideCalendar();
-        renderModalCalendar();
-      }, (err) => console.error("Error sync eventos", err));
-    }
+        const db = firebase.database();
+        db.goOnline(); // Mantiene conexión en iOS Safari
 
-    // Guardar Datos
-    function saveDayData() {
-      const dateKey = formatDateKey(currentDate);
-      localStorage.setItem(`agenda_day_${currentSyncKey}_${dateKey}`, JSON.stringify(dayData));
+        syncDbRef = db.ref('agendas/' + UNIQUE_SYNC_KEY);
 
-      if (db && isCloudConnected) {
-        const dayDocRef = doc(db, 'artifacts', 'mi-agenda-diaria', 'users', currentSyncKey, 'days', dateKey);
-        setDoc(dayDocRef, dayData, { merge: true }).catch(err => console.error(err));
+        // Escuchar datos en tiempo real de manera continua
+        syncDbRef.on('value', (snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            if (data.blocks) timeBlocksData = data.blocks;
+            if (data.tasks) tasksData = data.tasks;
+            if (data.notes) notesData = data.notes;
+            if (data.events) calendarEventsData = data.events;
+
+            renderTimeBlocks();
+            renderTasks();
+            renderNotes();
+            renderMiniCalendar();
+            if (document.getElementById('calendarModal').style.display === 'flex') {
+              renderFullCalendar();
+            }
+          }
+        });
+      } catch (e) {
+        console.error("Error al iniciar la sincronización:", e);
       }
     }
 
-    function saveEventsData() {
-      localStorage.setItem(`agenda_events_${currentSyncKey}`, JSON.stringify(eventsData));
-
-      if (db && isCloudConnected) {
-        const eventsDocRef = doc(db, 'artifacts', 'mi-agenda-diaria', 'users', currentSyncKey, 'calendar', 'events');
-        setDoc(eventsDocRef, { allEvents: eventsData }, { merge: true }).catch(err => console.error(err));
+    function pushData() {
+      if (syncDbRef) {
+        syncDbRef.set({
+          blocks: timeBlocksData,
+          tasks: tasksData,
+          notes: notesData,
+          events: calendarEventsData
+        });
       }
     }
 
-    // Fallback Local Storage
-    function loadLocalFallback() {
-      const dateKey = formatDateKey(currentDate);
-      const storedDay = localStorage.getItem(`agenda_day_${currentSyncKey}_${dateKey}`);
-      dayData = storedDay ? JSON.parse(storedDay) : { timeBlocks: {}, tasks: [], notes: '' };
-
-      const storedEvents = localStorage.getItem(`agenda_events_${currentSyncKey}`);
-      eventsData = storedEvents ? JSON.parse(storedEvents) : {};
-
-      renderAll();
+    function formatDate(d) {
+      return d.toISOString().split('T')[0];
     }
 
-    function renderAll() {
-      renderMainView();
-      renderSideCalendar();
-      renderModalCalendar();
-    }
-
-    // Renderizado de Vista Principal
-    function renderMainView() {
-      // Header fecha
-      const datePicker = document.getElementById('datePicker');
-      datePicker.value = formatDateKey(currentDate);
-
-      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-      document.getElementById('fullDateDisplay').textContent = currentDate.toLocaleDateString('es-ES', options);
-
-      // Bloques de Tiempo
+    function updateDateUI() {
+      document.getElementById('datePicker').value = formatDate(currentDate);
       renderTimeBlocks();
-      // Tareas
       renderTasks();
-      // Notas
       renderNotes();
+      renderMiniCalendar();
     }
 
-    // 1. Render Bloques de Tiempo
+    function changeDate(days) {
+      currentDate.setDate(currentDate.getDate() + days);
+      updateDateUI();
+    }
+
+    function goToToday() {
+      currentDate = new Date(2026, 9, 28);
+      updateDateUI();
+    }
+
+    function onDateChange(val) {
+      if (val) {
+        const parts = val.split('-');
+        currentDate = new Date(parts[0], parts[1] - 1, parts[2]);
+        updateDateUI();
+      }
+    }
+
     function renderTimeBlocks() {
       const container = document.getElementById('timeBlocksContainer');
       container.innerHTML = '';
-      let completedCount = 0;
+      const dateStr = formatDate(currentDate);
+      const dayBlocks = timeBlocksData[dateStr] || {};
 
-      TIME_SLOTS.forEach(slot => {
-        const b = dayData.timeBlocks[slot.id] || { text: '', done: false, starred: false };
-        if (b.done) completedCount++;
+      for (let h = 6; h <= 23; h++) {
+        for (let m of [0, 30]) {
+          const timeKey = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+          const nextM = m === 0 ? 30 : 0;
+          const nextH = m === 0 ? h : h + 1;
+          const nextTimeKey = `${String(nextH).padStart(2, '0')}:${String(nextM).padStart(2, '0')}`;
+          
+          const text = dayBlocks[timeKey] || '';
 
-        const el = document.createElement('div');
-        el.className = `flex items-center gap-2 p-2 sm:p-2.5 rounded-xl border transition ${
-          b.done ? 'bg-emerald-950/20 border-emerald-800/40' : 'bg-darkInput hover:bg-darkInputHover border-gray-800/80'
-        }`;
-
-        el.innerHTML = `
-          <div class="w-16 sm:w-20 text-xs font-bold text-gray-300 flex flex-col shrink-0">
-            <span>${slot.label}</span>
-            <span class="text-[10px] text-gray-500 font-normal">${slot.sublabel}</span>
-          </div>
-
-          <input type="text" 
-            value="${escapeHtml(b.text || '')}" 
-            placeholder="¿Qué hiciste o planeas hacer?" 
-            data-slot="${slot.id}"
-            class="block-text-input flex-grow bg-transparent text-sm text-white placeholder-gray-600 border-none focus:outline-none ${b.done ? 'line-through text-gray-400' : ''}"
-          />
-
-          <div class="flex items-center gap-1.5 shrink-0">
-            <button data-slot="${slot.id}" class="star-btn p-1.5 text-xs rounded-lg ${b.starred ? 'text-amber-400 hover:text-amber-300' : 'text-gray-600 hover:text-gray-400'}">
-              <i class="${b.starred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
-            </button>
-            <button data-slot="${slot.id}" class="check-btn p-1.5 text-xs rounded-lg ${b.done ? 'text-emerald-400' : 'text-gray-600 hover:text-emerald-400'}">
-              <i class="${b.done ? 'fa-solid fa-circle-check' : 'fa-regular fa-circle'}"></i>
-            </button>
-          </div>
-        `;
-
-        container.appendChild(el);
-      });
-
-      document.getElementById('completedBlocksCount').textContent = completedCount;
-
-      // Event listeners
-      container.querySelectorAll('.block-text-input').forEach(input => {
-        input.addEventListener('change', (e) => {
-          const slotId = e.target.getAttribute('data-slot');
-          if (!dayData.timeBlocks[slotId]) dayData.timeBlocks[slotId] = { text: '', done: false, starred: false };
-          dayData.timeBlocks[slotId].text = e.target.value;
-          saveDayData();
-        });
-      });
-
-      container.querySelectorAll('.star-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const slotId = btn.getAttribute('data-slot');
-          if (!dayData.timeBlocks[slotId]) dayData.timeBlocks[slotId] = { text: '', done: false, starred: false };
-          dayData.timeBlocks[slotId].starred = !dayData.timeBlocks[slotId].starred;
-          saveDayData();
-          renderTimeBlocks();
-        });
-      });
-
-      container.querySelectorAll('.check-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const slotId = btn.getAttribute('data-slot');
-          if (!dayData.timeBlocks[slotId]) dayData.timeBlocks[slotId] = { text: '', done: false, starred: false };
-          dayData.timeBlocks[slotId].done = !dayData.timeBlocks[slotId].done;
-          saveDayData();
-          renderTimeBlocks();
-        });
-      });
-    }
-
-    // 2. Render Tareas
-    function renderTasks() {
-      const list = document.getElementById('taskList');
-      const emptyNotice = document.getElementById('emptyTasksNotice');
-      list.innerHTML = '';
-
-      const tasks = dayData.tasks || [];
-      const completed = tasks.filter(t => t.done).length;
-      document.getElementById('tasksCounter').textContent = `${completed}/${tasks.length}`;
-
-      if (tasks.length === 0) emptyNotice.classList.remove('hidden');
-      else emptyNotice.classList.add('hidden');
-
-      tasks.forEach((task, idx) => {
-        const item = document.createElement('div');
-        item.className = 'flex items-center justify-between gap-2 p-2.5 bg-darkInput rounded-xl border border-gray-800/80';
-        item.innerHTML = `
-          <div class="flex items-center gap-2.5 flex-grow overflow-hidden">
-            <button data-index="${idx}" class="toggle-task-btn text-base ${task.done ? 'text-emerald-500' : 'text-gray-600 hover:text-emerald-500'}">
-              <i class="${task.done ? 'fa-solid fa-square-check' : 'fa-regular fa-square'}"></i>
-            </button>
-            <span class="text-xs text-white truncate ${task.done ? 'line-through text-gray-500' : ''}">${escapeHtml(task.text)}</span>
-          </div>
-          <button data-index="${idx}" class="delete-task-btn text-xs text-gray-600 hover:text-red-400 p-1">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        `;
-        list.appendChild(item);
-      });
-
-      list.querySelectorAll('.toggle-task-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const idx = parseInt(btn.getAttribute('data-index'));
-          dayData.tasks[idx].done = !dayData.tasks[idx].done;
-          saveDayData();
-          renderTasks();
-        });
-      });
-
-      list.querySelectorAll('.delete-task-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const idx = parseInt(btn.getAttribute('data-index'));
-          dayData.tasks.splice(idx, 1);
-          saveDayData();
-          renderTasks();
-        });
-      });
-    }
-
-    // 3. Render Apuntes
-    function renderNotes() {
-      document.getElementById('dailyNotesInput').value = dayData.notes || '';
-    }
-
-    // 4. Render Calendario Previa Lateral
-    function renderSideCalendar() {
-      const year = sideCalendarViewDate.getFullYear();
-      const month = sideCalendarViewDate.getMonth();
-
-      const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-      document.getElementById('sideCalMonthYearTitle').textContent = `${monthNames[month]} De ${year}`;
-
-      const grid = document.getElementById('sideCalendarGrid');
-      grid.innerHTML = '';
-
-      const firstDayOfMonth = new Date(year, month, 1).getDay();
-      const startingDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      const daysInPrevMonth = new Date(year, month, 0).getDate();
-
-      for (let i = startingDay - 1; i >= 0; i--) {
-        const div = document.createElement('div');
-        div.className = 'py-2 text-gray-700 cursor-not-allowed';
-        div.textContent = daysInPrevMonth - i;
-        grid.appendChild(div);
-      }
-
-      const selectedKey = formatDateKey(currentDate);
-      const todayKey = formatDateKey(new Date());
-
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dateObj = new Date(year, month, day);
-        const dateKey = formatDateKey(dateObj);
-        const dayEvents = eventsData[dateKey] || [];
-
-        const dayBtn = document.createElement('button');
-        let classes = "py-2 rounded-xl text-xs font-semibold transition hover:bg-gray-800 relative ";
-
-        if (dateKey === selectedKey) {
-          classes += "bg-brand-600 text-white shadow-lg ";
-        } else if (dateKey === todayKey) {
-          classes += "border border-brand-500 text-brand-400 ";
-        } else {
-          classes += "text-gray-300 ";
+          const row = document.createElement('div');
+          row.className = 'flex items-center gap-3 p-2 bg-slate-900/60 rounded-xl border border-slate-800/80 hover:border-slate-700 transition';
+          row.innerHTML = `
+            <div class="w-16 text-xs text-gray-400 font-mono font-medium">
+              <div>${timeKey}</div>
+              <div class="text-[10px] text-gray-600">${nextTimeKey}</div>
+            </div>
+            <input type="text" value="${text}" placeholder="¿Qué hiciste o planeas hacer?" 
+                   class="flex-1 input-bg px-3 py-1.5 rounded-lg text-sm"
+                   oninput="saveBlock('${timeKey}', this.value)">
+          `;
+          container.appendChild(row);
         }
-
-        dayBtn.className = classes;
-        dayBtn.innerHTML = `
-          <span>${day}</span>
-          ${dayEvents.length > 0 ? `<span class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-brand-400"></span>` : ''}
-        `;
-
-        dayBtn.addEventListener('click', () => {
-          currentDate = dateObj;
-          setupFirestoreListeners();
-          loadLocalFallback();
-        });
-
-        grid.appendChild(dayBtn);
       }
     }
 
-    // 5. Render MODAL CALENDARIO DE EVENTOS (Idéntico a Imagen 2)
-    function renderModalCalendar() {
-      const year = modalCalendarViewDate.getFullYear();
-      const month = modalCalendarViewDate.getMonth();
+    function saveBlock(timeKey, value) {
+      const dateStr = formatDate(currentDate);
+      if (!timeBlocksData[dateStr]) timeBlocksData[dateStr] = {};
+      timeBlocksData[dateStr][timeKey] = value;
+      pushData();
+    }
 
-      const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-      document.getElementById('modalCalTitle').textContent = `${monthNames[month]} DE ${year}`;
+    function clearBlocks() {
+      if (confirm("¿Limpiar bloques de hoy?")) {
+        const dateStr = formatDate(currentDate);
+        timeBlocksData[dateStr] = {};
+        renderTimeBlocks();
+        pushData();
+      }
+    }
+
+    function renderTasks() {
+      const list = document.getElementById('tasksList');
+      list.innerHTML = '';
+      const dateStr = formatDate(currentDate);
+      const dayTasks = tasksData[dateStr] || [];
+
+      let completedCount = 0;
+      dayTasks.forEach((task, index) => {
+        if (task.done) completedCount++;
+        const li = document.createElement('li');
+        li.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-900/80 border border-slate-800';
+        li.innerHTML = `
+          <div class="flex items-center gap-2">
+            <input type="checkbox" ${task.done ? 'checked' : ''} onchange="toggleTask(${index})" class="rounded bg-slate-800 border-slate-700 text-blue-600 focus:ring-0">
+            <span class="text-sm ${task.done ? 'line-through text-gray-500' : 'text-gray-200'}">${task.text}</span>
+          </div>
+          <button onclick="deleteTask(${index})" class="text-xs text-gray-500 hover:text-red-400"><i class="fa-solid fa-xmark"></i></button>
+        `;
+        list.appendChild(li);
+      });
+
+      document.getElementById('tasksCounter').innerText = `${completedCount}/${dayTasks.length}`;
+    }
+
+    function addTask() {
+      const input = document.getElementById('newTaskInput');
+      const text = input.value.trim();
+      if (!text) return;
+      const dateStr = formatDate(currentDate);
+      if (!tasksData[dateStr]) tasksData[dateStr] = [];
+      tasksData[dateStr].push({ text, done: false });
+      input.value = '';
+      renderTasks();
+      pushData();
+    }
+
+    function toggleTask(index) {
+      const dateStr = formatDate(currentDate);
+      tasksData[dateStr][index].done = !tasksData[dateStr][index].done;
+      renderTasks();
+      pushData();
+    }
+
+    function deleteTask(index) {
+      const dateStr = formatDate(currentDate);
+      tasksData[dateStr].splice(index, 1);
+      renderTasks();
+      pushData();
+    }
+
+    function renderNotes() {
+      const dateStr = formatDate(currentDate);
+      document.getElementById('notesArea').value = notesData[dateStr] || '';
+    }
+
+    function saveNotes() {
+      const dateStr = formatDate(currentDate);
+      notesData[dateStr] = document.getElementById('notesArea').value;
+      pushData();
+    }
+
+    function renderMiniCalendar() {
+      const mini = document.getElementById('miniCalendar');
+      mini.innerHTML = '';
+
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      const daysOfWeek = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+      daysOfWeek.forEach(d => {
+        mini.innerHTML += `<div class="text-gray-500 font-bold py-1">${d}</div>`;
+      });
+
+      let offset = firstDay === 0 ? 6 : firstDay - 1;
+      for (let i = 0; i < offset; i++) {
+        mini.innerHTML += `<div></div>`;
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const isToday = d === currentDate.getDate();
+        mini.innerHTML += `
+          <div class="py-1 rounded-md text-xs cursor-pointer ${isToday ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 text-gray-300'}"
+               onclick="selectMiniCalendarDay(${d})">
+            ${d}
+          </div>
+        `;
+      }
+    }
+
+    function selectMiniCalendarDay(day) {
+      currentDate.setDate(day);
+      updateDateUI();
+    }
+
+    function openFullCalendar() {
+      modalDate = new Date(currentDate);
+      document.getElementById('calendarModal').style.display = 'flex';
+      renderFullCalendar();
+    }
+
+    function closeFullCalendar() {
+      document.getElementById('calendarModal').style.display = 'none';
+    }
+
+    function changeModalMonth(diff) {
+      modalDate.setMonth(modalDate.getMonth() + diff);
+      renderFullCalendar();
+    }
+
+    function renderFullCalendar() {
+      const year = modalDate.getFullYear();
+      const month = modalDate.getMonth();
+      
+      const monthsEs = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+      document.getElementById('modalMonthTitle').innerText = `${monthsEs[month]} de ${year}`;
 
       const grid = document.getElementById('modalCalendarGrid');
       grid.innerHTML = '';
 
-      const firstDayOfMonth = new Date(year, month, 1).getDay();
-      const startingDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+      const firstDay = new Date(year, month, 1).getDay();
       const daysInMonth = new Date(year, month + 1, 0).getDate();
-      const daysInPrevMonth = new Date(year, month, 0).getDate();
 
-      // Días mes anterior
-      for (let i = startingDay - 1; i >= 0; i--) {
-        const div = document.createElement('div');
-        div.className = 'min-h-[70px] sm:min-h-[85px] bg-[#111827]/40 border border-gray-800/40 rounded-xl p-2 text-gray-700 select-none';
-        div.textContent = daysInPrevMonth - i;
-        grid.appendChild(div);
+      let offset = firstDay === 0 ? 6 : firstDay - 1;
+      for (let i = 0; i < offset; i++) {
+        grid.innerHTML += `<div class="h-20 bg-slate-900/30 rounded-xl"></div>`;
       }
 
-      const selectedModalKey = formatDateKey(selectedModalDate);
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const dayEvents = calendarEventsData[dStr] || [];
+        const isSelected = dStr === selectedModalDateStr;
 
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dateObj = new Date(year, month, day);
-        const dateKey = formatDateKey(dateObj);
-        const dayEvents = eventsData[dateKey] || [];
-
-        const isSelected = (dateKey === selectedModalKey);
-
-        const card = document.createElement('div');
-        card.className = `min-h-[70px] sm:min-h-[85px] bg-[#162032] border rounded-xl p-1.5 sm:p-2 cursor-pointer transition flex flex-col justify-between relative overflow-hidden ${
-          isSelected ? 'border-brand-500 ring-2 ring-brand-500/30 bg-[#1c293e]' : 'border-gray-800 hover:border-gray-700'
-        }`;
-
-        // Header celda día + Badge contador
-        let html = `
-          <div class="flex justify-between items-center w-full">
-            <span class="text-xs sm:text-sm font-bold text-white">${day}</span>
-            ${dayEvents.length > 0 ? `<span class="bg-brand-600 text-white text-[10px] font-bold w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center shadow">${dayEvents.length}</span>` : ''}
+        let eventsPills = dayEvents.map(e => `
+          <div class="text-[10px] truncate px-1.5 py-0.5 rounded text-white" style="background-color: ${e.color}">
+            ● ${e.title}
           </div>
-          <div class="space-y-1 mt-1 overflow-hidden">
+        `).join('');
+
+        const dayCard = document.createElement('div');
+        dayCard.className = `h-20 card-bg p-1.5 rounded-xl border flex flex-col justify-between cursor-pointer transition relative ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/50' : 'hover:border-gray-700'}`;
+        dayCard.onclick = () => selectModalDay(dStr);
+
+        dayCard.innerHTML = `
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold text-gray-200">${d}</span>
+            ${dayEvents.length > 0 ? `<span class="bg-blue-600 text-white text-[10px] px-1.5 rounded-full">${dayEvents.length}</span>` : ''}
+          </div>
+          <div class="space-y-1 overflow-hidden">
+            ${eventsPills}
+          </div>
         `;
-
-        // Píldoras de eventos dentro de la celda
-        dayEvents.slice(0, 2).forEach(evt => {
-          html += `
-            <div class="text-[10px] font-semibold text-white px-2 py-0.5 rounded-md truncate flex items-center gap-1 shadow-sm" style="background-color: ${evt.color || '#3b82f6'}22; border-left: 3px solid ${evt.color || '#3b82f6'}">
-              <span class="w-1.5 h-1.5 rounded-full" style="background-color: ${evt.color || '#3b82f6'}"></span>
-              <span class="truncate">${escapeHtml(evt.text)}</span>
-            </div>
-          `;
-        });
-
-        if (dayEvents.length > 2) {
-          html += `<div class="text-[9px] text-gray-400 pl-1">+${dayEvents.length - 2} más</div>`;
-        }
-
-        html += `</div>`;
-        card.innerHTML = html;
-
-        card.addEventListener('click', () => {
-          selectedModalDate = dateObj;
-          renderModalCalendar();
-        });
-
-        grid.appendChild(card);
+        grid.appendChild(dayCard);
       }
 
-      renderSelectedDayDetails();
+      renderSelectedDayEvents();
     }
 
-    // Renderizar Panel Inferior del Día Seleccionado en Modal
-    function renderSelectedDayDetails() {
-      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-      document.getElementById('selectedDayTitle').textContent = selectedModalDate.toLocaleDateString('es-ES', options);
+    function selectModalDay(dateStr) {
+      selectedModalDateStr = dateStr;
+      renderFullCalendar();
+    }
 
-      const dateKey = formatDateKey(selectedModalDate);
-      const dayEvents = eventsData[dateKey] || [];
-      const listContainer = document.getElementById('selectedDayEventsList');
-      listContainer.innerHTML = '';
+    function renderSelectedDayEvents() {
+      const title = document.getElementById('selectedDayTitle');
+      const eventsContainer = document.getElementById('selectedDayEvents');
+      
+      const parts = selectedModalDateStr.split('-');
+      title.innerText = `Eventos para el ${parts[2]}/${parts[1]}/${parts[0]}:`;
+
+      const dayEvents = calendarEventsData[selectedModalDateStr] || [];
+      eventsContainer.innerHTML = '';
 
       if (dayEvents.length === 0) {
-        listContainer.innerHTML = `<span class="text-xs text-gray-500 italic">No hay eventos registrados para este día.</span>`;
-      } else {
-        dayEvents.forEach(evt => {
-          const pill = document.createElement('div');
-          pill.className = 'flex items-center gap-2 px-3 py-1 rounded-xl text-xs font-semibold text-white shadow transition';
-          pill.style.backgroundColor = `${evt.color || '#3b82f6'}33`;
-          pill.style.border = `1px solid ${evt.color || '#3b82f6'}`;
-
-          pill.innerHTML = `
-            <span class="w-2 h-2 rounded-full" style="background-color: ${evt.color || '#3b82f6'}"></span>
-            <span>${escapeHtml(evt.text)}</span>
-            <button data-id="${evt.id}" class="delete-event-btn text-gray-400 hover:text-red-400 ml-1">
-              &times;
-            </button>
-          `;
-
-          listContainer.appendChild(pill);
-        });
-
-        listContainer.querySelectorAll('.delete-event-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const evtId = btn.getAttribute('data-id');
-            eventsData[dateKey] = eventsData[dateKey].filter(x => x.id !== evtId);
-            if (eventsData[dateKey].length === 0) delete eventsData[dateKey];
-            saveEventsData();
-            renderModalCalendar();
-            renderSideCalendar();
-          });
-        });
+        eventsContainer.innerHTML = `<span class="text-xs text-gray-500">No hay eventos para este día.</span>`;
+        return;
       }
-    }
 
-    // Utilidad Escape HTML
-    function escapeHtml(str) {
-      return (str || '').replace(/[&<>"']/g, (m) => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
-      }[m]));
-    }
-
-    // EVENT LISTENERS DE NAVEGACIÓN Y ACCIONES
-
-    // Navegación de Fechas en Vista Principal
-    document.getElementById('datePicker').addEventListener('change', (e) => {
-      if (e.target.value) {
-        const [y, m, d] = e.target.value.split('-').map(Number);
-        currentDate = new Date(y, m - 1, d);
-        sideCalendarViewDate = new Date(currentDate);
-        setupFirestoreListeners();
-        loadLocalFallback();
-      }
-    });
-
-    document.getElementById('prevDayBtn').addEventListener('click', () => {
-      currentDate.setDate(currentDate.getDate() - 1);
-      sideCalendarViewDate = new Date(currentDate);
-      setupFirestoreListeners();
-      loadLocalFallback();
-    });
-
-    document.getElementById('nextDayBtn').addEventListener('click', () => {
-      currentDate.setDate(currentDate.getDate() + 1);
-      sideCalendarViewDate = new Date(currentDate);
-      setupFirestoreListeners();
-      loadLocalFallback();
-    });
-
-    document.getElementById('todayBtn').addEventListener('click', () => {
-      currentDate = new Date();
-      sideCalendarViewDate = new Date();
-      setupFirestoreListeners();
-      loadLocalFallback();
-    });
-
-    // Calendario Previa
-    document.getElementById('sideCalPrevMonth').addEventListener('click', () => {
-      sideCalendarViewDate.setMonth(sideCalendarViewDate.getMonth() - 1);
-      renderSideCalendar();
-    });
-
-    document.getElementById('sideCalNextMonth').addEventListener('click', () => {
-      sideCalendarViewDate.setMonth(sideCalendarViewDate.getMonth() + 1);
-      renderSideCalendar();
-    });
-
-    // Acciones Tareas y Notas
-    document.getElementById('addTaskForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const input = document.getElementById('newTaskInput');
-      const val = input.value.trim();
-      if (val) {
-        if (!dayData.tasks) dayData.tasks = [];
-        dayData.tasks.push({ text: val, done: false });
-        input.value = '';
-        saveDayData();
-        renderTasks();
-      }
-    });
-
-    document.getElementById('dailyNotesInput').addEventListener('input', (e) => {
-      dayData.notes = e.target.value;
-      saveDayData();
-    });
-
-    document.getElementById('clearBlocksBtn').addEventListener('click', () => {
-      if (confirm("¿Deseas limpiar los bloques de tiempo de hoy?")) {
-        dayData.timeBlocks = {};
-        saveDayData();
-        renderTimeBlocks();
-      }
-    });
-
-    // Modal de Calendario Completo (Abrir / Cerrar)
-    const fullCalendarModal = document.getElementById('fullCalendarModal');
-    const openFullCalendarBtn = document.getElementById('openFullCalendarBtn');
-    const quickAddEventBtn = document.getElementById('quickAddEventBtn');
-    const closeFullCalendarModalBtn = document.getElementById('closeFullCalendarModalBtn');
-
-    function openModalCalendar() {
-      selectedModalDate = new Date(currentDate);
-      modalCalendarViewDate = new Date(currentDate);
-      renderModalCalendar();
-      fullCalendarModal.classList.remove('hidden');
-    }
-
-    openFullCalendarBtn.addEventListener('click', openModalCalendar);
-    quickAddEventBtn.addEventListener('click', openModalCalendar);
-
-    closeFullCalendarModalBtn.addEventListener('click', () => {
-      fullCalendarModal.classList.add('hidden');
-    });
-
-    document.getElementById('modalCalPrevMonth').addEventListener('click', () => {
-      modalCalendarViewDate.setMonth(modalCalendarViewDate.getMonth() - 1);
-      renderModalCalendar();
-    });
-
-    document.getElementById('modalCalNextMonth').addEventListener('click', () => {
-      modalCalendarViewDate.setMonth(modalCalendarViewDate.getMonth() + 1);
-      renderModalCalendar();
-    });
-
-    document.getElementById('modalCalTodayBtn').addEventListener('click', () => {
-      modalCalendarViewDate = new Date();
-      selectedModalDate = new Date();
-      renderModalCalendar();
-    });
-
-    // Selección de Color para Eventos
-    document.querySelectorAll('.color-picker-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.color-picker-btn').forEach(b => {
-          b.classList.remove('ring-2', 'ring-white', 'scale-110');
-        });
-        btn.classList.add('ring-2', 'ring-white', 'scale-110');
-        selectedEventColor = btn.getAttribute('data-color');
+      dayEvents.forEach((ev, idx) => {
+        const tag = document.createElement('div');
+        tag.className = 'flex items-center gap-2 px-2.5 py-1 rounded-full text-xs text-white shadow';
+        tag.style.backgroundColor = ev.color;
+        tag.innerHTML = `
+          <span>● ${ev.title}</span>
+          <button onclick="deleteCalendarEvent(${idx})" class="hover:text-red-200"><i class="fa-solid fa-xmark"></i></button>
+        `;
+        eventsContainer.appendChild(tag);
       });
-    });
+    }
 
-    // Añadir Evento
-    document.getElementById('addEventBtn').addEventListener('click', () => {
-      const input = document.getElementById('newEventTextInput');
-      const text = input.value.trim();
-      if (text) {
-        const dateKey = formatDateKey(selectedModalDate);
-        if (!eventsData[dateKey]) eventsData[dateKey] = [];
+    function selectColor(colorHex) {
+      selectedColor = colorHex;
+      document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('ring-2', 'ring-white'));
+      event.target.classList.add('ring-2', 'ring-white');
+    }
 
-        eventsData[dateKey].push({
-          id: 'evt_' + Math.random().toString(36).substr(2, 9),
-          text: text,
-          color: selectedEventColor
-        });
+    function addCalendarEvent() {
+      const input = document.getElementById('newEventInput');
+      const title = input.value.trim();
+      if (!title) return;
 
-        input.value = '';
-        saveEventsData();
-        renderModalCalendar();
-        renderSideCalendar();
+      if (!calendarEventsData[selectedModalDateStr]) {
+        calendarEventsData[selectedModalDateStr] = [];
       }
-    });
 
-    // Botón "Ver agenda" desde el modal
-    document.getElementById('goToAgendaBtn').addEventListener('click', () => {
-      currentDate = new Date(selectedModalDate);
-      sideCalendarViewDate = new Date(currentDate);
-      fullCalendarModal.classList.add('hidden');
-      setupFirestoreListeners();
-      loadLocalFallback();
-    });
+      calendarEventsData[selectedModalDateStr].push({ title, color: selectedColor });
+      input.value = '';
+      renderFullCalendar();
+      pushData();
+    }
 
-    // Modal de Sincronización
-    const syncModal = document.getElementById('syncModal');
-    const openSyncModalBtn = document.getElementById('openSyncModalBtn');
-    const closeSyncModalBtn = document.getElementById('closeSyncModalBtn');
-    const saveSyncKeyBtn = document.getElementById('saveSyncKeyBtn');
-    const syncUserKeyInput = document.getElementById('syncUserKey');
+    function deleteCalendarEvent(index) {
+      calendarEventsData[selectedModalDateStr].splice(index, 1);
+      renderFullCalendar();
+      pushData();
+    }
 
-    openSyncModalBtn.addEventListener('click', () => {
-      syncUserKeyInput.value = currentSyncKey;
-      syncModal.classList.remove('hidden');
-    });
-
-    closeSyncModalBtn.addEventListener('click', () => {
-      syncModal.classList.add('hidden');
-    });
-
-    saveSyncKeyBtn.addEventListener('click', () => {
-      const val = syncUserKeyInput.value.trim();
-      if (val) {
-        currentSyncKey = val;
-        localStorage.setItem('agenda_sync_key', currentSyncKey);
-        syncModal.classList.add('hidden');
-        setupFirestoreListeners();
-        loadLocalFallback();
-      }
-    });
-
-    // Carga inicial
-    loadLocalFallback();
-
+    window.onload = () => {
+      updateDateUI();
+      initAutoSync();
+    };
   </script>
 </body>
 </html>
